@@ -1,0 +1,138 @@
+@import "leaflet/dist/leaflet.css";
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Regular.woff2') format('woff2'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Regular.woff') format('woff'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Medium.woff2') format('woff2'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Medium.woff') format('woff'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Bold.woff2') format('woff2'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Bold.woff') format('woff'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/wp-content/themes/poco/assets/fonts/new/Gilroy-ExtraBold.woff2') format('woff2'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-ExtraBold.woff') format('woff'),
+       url('/wp-content/themes/poco/assets/fonts/new/Gilroy-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-color: #AF0F26;
+  font-size: 16px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    font-size: 18px;
+  }
+}
+
+@layer base {
+  .bg-primary {
+    background-color: var(--primary-color);
+  }
+  .text-primary {
+    color: var(--primary-color);
+  }
+  .border-primary {
+    border-color: var(--primary-color);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fade-in-up 0.8s ease-out forwards;
+  }
+  .animate-fade-in {
+    animation: fade-in 1s ease-out forwards;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.5s ease-out forwards;
+  }
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animate-delay-600 {
+    animation-delay: 600ms;
+  }
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+  .pause-on-hover:hover {
+    animation-play-state: paused;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

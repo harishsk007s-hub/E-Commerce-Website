@@ -1,0 +1,32 @@
+/* Custom styles for Admin and Developer Panels */
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.card-dev, .card shadow-sm {
+    border-radius: 12px;
+}
+
+.table th {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    color: #6c757d;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}

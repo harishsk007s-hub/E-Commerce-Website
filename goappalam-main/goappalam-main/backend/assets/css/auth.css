@@ -1,0 +1,45 @@
+body {
+    background-color: #f4f7f6;
+    font-family: 'Inter', sans-serif;
+}
+
+.auth-card {
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    background-color: #ffffff;
+    padding: 2.5rem;
+    margin-top: 5rem;
+}
+
+.btn-primary {
+    background-color: #FFC222;
+    border-color: #FFC222;
+    color: #1E1D23;
+    font-weight: bold;
+}
+
+.btn-primary:hover {
+    background-color: #e5af1f;
+    border-color: #e5af1f;
+    color: #1E1D23;
+}
+
+.auth-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.auth-header img {
+    max-width: 150px;
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 600;
+}
+
+.checkout-section-title {
+    border-bottom: 2px solid #FFC222;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}

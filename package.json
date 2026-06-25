@@ -1,0 +1,11 @@
+{
+  "name": "goappalam-root",
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm install --prefix goappalam-main/goappalam-main && npm install --prefix goappalam-main/goappalam-main/server",
+    "dev:frontend": "npm run dev --prefix goappalam-main/goappalam-main",
+    "dev:server": "npm run dev --prefix goappalam-main/goappalam-main/server",
+    "dev": "npm run dev:all --prefix goappalam-main/goappalam-main",
+    "dev:all": "npm run dev:all --prefix goappalam-main/goappalam-main"
+  }
+}

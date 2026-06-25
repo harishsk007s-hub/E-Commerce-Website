@@ -1,0 +1,47 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Production security rules
+  # Deny access to sensitive files and folders
+  RewriteRule ^\.env - [F,L]
+  RewriteRule ^backend/(config|includes)/ - [F,L]
+  RewriteRule "(^|/)\." - [F]
+
+  # 2. Redirect uploads from root to backend/uploads
+  RewriteRule ^uploads/(.*)$ backend/uploads/$1 [L]
+
+  # 1. Alias /admin to backend/admin/
+  RewriteRule ^admin$ admin/ [R=301,L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^admin/(.*)$ backend/admin/$1 [L,QSA]
+
+  # 2. Alias /developer to backend/developer/
+  RewriteRule ^developer$ developer/ [R=301,L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^developer/(.*)$ backend/developer/$1 [L,QSA]
+
+  # 3. Explicitly allow access to index.php
+  RewriteRule ^admin/$ backend/admin/index.php [L]
+  RewriteRule ^developer/$ backend/developer/index.php [L]
+
+  # 4. Prevent React from handling any request that should go to the backend/admin/developer folder
+  RewriteRule ^(backend|admin|developer|uploads)($|/) - [L]
+
+  # 5. React Routing fallback
+  # Only run if the file doesn't exist and it's NOT a backend/admin/developer request
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . index.html [L]
+</IfModule>
+
+# ==========================================
+# PRODUCTION SECURITY RULES
+# ==========================================
+
+# Disable directory listings
+<IfModule mod_autoindex.c>
+  Options -Indexes
+</IfModule>

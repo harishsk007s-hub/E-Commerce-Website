@@ -1,0 +1,41 @@
+# Recommended .htaccess for production (place as public_html/.htaccess)
+
+# Disable directory listings
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Don't rewrite requests to existing files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Route everything else to index.html (for SPA)
+  RewriteRule ^ index.html [L,QSA]
+</IfModule>
+
+# Deny access to environment files
+<Files ".env">
+  Require all denied
+</Files>
+
+# Deny access to backend config and includes directories
+<IfModule mod_authz_core.c>
+  <LocationMatch "^/backend/(config|includes)/">
+    Require all denied
+  </LocationMatch>
+</IfModule>
+
+# Apache 2.2 fallback
+<IfModule !mod_authz_core.c>
+  <Files ".env">
+    Order allow,deny
+    Deny from all
+  </Files>
+  <LocationMatch "^/backend/(config|includes)/">
+    Order allow,deny
+    Deny from all
+  </LocationMatch>
+</IfModule>

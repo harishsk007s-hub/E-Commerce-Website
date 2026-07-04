@@ -1,0 +1,39 @@
+# Node & Build
+node_modules/
+dist/
+dist.zip
+backend.zip
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Server & Backend
+server/node_modules/
+server/dist/
+backend/node_modules/
+
+# Local configuration
+.env
+.env.local
+.env.*.local
+
+# Database backups & local files
+*.sql
+*.zip
+*.rar
+*.tar.gz
+hash.txt
+old files/
+legacy/
+
+# Uploads directory
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# System & Editor Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

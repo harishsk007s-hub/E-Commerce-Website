@@ -33,25 +33,25 @@ $avg_order_value = $total_orders > 0 ? $total_revenue / $total_orders : 0;
 
 // 2. Daily Sales (Last 14 Days)
 $daily_sales = $pdo->query("
-    SELECT DATE(created_at) as date, SUM(total) as revenue, COUNT(*) as count 
+    SELECT CAST(created_at AS DATE) as date, SUM(total) as revenue, COUNT(*) as count 
     FROM orders 
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
-    GROUP BY DATE(created_at) 
+    WHERE created_at >= NOW() - INTERVAL '14 days'
+    GROUP BY CAST(created_at AS DATE) 
     ORDER BY date ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // 3. Weekly Sales (Last 12 Weeks)
 $weekly_sales = $pdo->query("
-    SELECT YEARWEEK(created_at, 1) as week_num, MIN(DATE(created_at)) as week_start, SUM(total) as revenue, COUNT(*) as count 
+    SELECT TO_CHAR(created_at, 'IYYY-IW') as week_num, CAST(date_trunc('week', created_at) AS DATE) as week_start, SUM(total) as revenue, COUNT(*) as count 
     FROM orders 
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
-    GROUP BY week_num 
+    WHERE created_at >= NOW() - INTERVAL '12 weeks'
+    GROUP BY week_num, week_start 
     ORDER BY week_num ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // 4. Monthly Sales (Last 6 Months)
 $monthly_sales = $pdo->query("
-    SELECT DATE_FORMAT(created_at, '%Y-%m') as month, SUM(total) as revenue, COUNT(*) as count 
+    SELECT TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total) as revenue, COUNT(*) as count 
     FROM orders 
     GROUP BY month 
     ORDER BY month DESC 

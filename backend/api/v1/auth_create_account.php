@@ -92,7 +92,7 @@ try {
     // Create customer
     $stmt = $pdo->prepare("INSERT INTO customers (name, email, phone, username, password_hash) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$name, $email, $phone, $username, $password_hash]);
-    $user_id = $pdo->lastInsertId();
+    $user_id = $pdo->lastInsertId('customers_id_seq');
 
     // Generate token for direct login
     $token_str = bin2hex(random_bytes(32));

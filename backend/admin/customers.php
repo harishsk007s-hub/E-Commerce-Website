@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'add') {
                 $error = "Email already registered.";
             } else {
                 // Determine if role column exists
-                $res = $pdo->query("SHOW COLUMNS FROM customers LIKE 'role'");
+                $res = $pdo->query("SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'role'");
                 $has_role = $res->rowCount() > 0;
                 
                 if ($has_role) {

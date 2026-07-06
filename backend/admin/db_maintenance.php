@@ -10,19 +10,27 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'super-admin') {
 }
 
 try {
-    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-    
-    // Reset auto-increment for core tables
+    // Reset sequence counters for core tables in PostgreSQL
     $tables = ['customers', 'orders', 'payments', 'invoices', 'carts', 'activity_logs', 'api_logs', 'inventory_logs'];
     
     foreach ($tables as $table) {
-        // Double check if empty before resetting? Or just reset.
-        $pdo->exec("ALTER TABLE `$table` AUTO_INCREMENT = 1;");
+        $seq = "{$table}_id_seq";
+        $res = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM \"$table\"")->fetch();
+        $next_id = $res['next_id'] ?? 1;
+        
+        // For orders, start from 1001 if empty
+        if ($table === 'orders' && $next_id == 1) {
+            $next_id = 1001;
+        }
+        
+        try {
+            $pdo->exec("ALTER SEQUENCE \"$seq\" RESTART WITH $next_id");
+        } catch (Exception $seqEx) {
+            // Ignore if sequence doesn't exist
+        }
     }
     
-    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-    
-    echo "Database auto-increment counters have been reset to 1 successfully.";
+    echo "Database auto-increment counters have been reset successfully.";
 } catch (Exception $e) {
     echo "Error resetting database: " . $e->getMessage();
 }

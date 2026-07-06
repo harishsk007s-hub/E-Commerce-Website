@@ -30,7 +30,7 @@ if (!$user) {
     
     $stmt = $pdo->prepare("INSERT INTO customers (name, email, username) VALUES (?, ?, ?)");
     $stmt->execute([$name, $email, $username]);
-    $user_id = $pdo->lastInsertId();
+    $user_id = $pdo->lastInsertId('customers_id_seq');
     
     $user = [
         'id' => $user_id,

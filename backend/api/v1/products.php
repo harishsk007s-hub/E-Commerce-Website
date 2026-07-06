@@ -64,18 +64,18 @@ try {
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare("INSERT INTO products (name, sku, price, price_1kg, price_500g, price_250g, category_id, slug, status, images, description) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-                                   ON DUPLICATE KEY UPDATE 
-                                   name = VALUES(name), 
-                                   price = VALUES(price), 
-                                   price_1kg = VALUES(price_1kg),
-                                   price_500g = VALUES(price_500g),
-                                   price_250g = VALUES(price_250g),
-                                   category_id = VALUES(category_id), 
-                                   slug = VALUES(slug), 
-                                   status = VALUES(status), 
-                                   images = VALUES(images), 
-                                   description = VALUES(description)");
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json, ?) 
+                                   ON CONFLICT (sku) DO UPDATE SET 
+                                   name = EXCLUDED.name, 
+                                   price = EXCLUDED.price, 
+                                   price_1kg = EXCLUDED.price_1kg,
+                                   price_500g = EXCLUDED.price_500g,
+                                   price_250g = EXCLUDED.price_250g,
+                                   category_id = EXCLUDED.category_id, 
+                                   slug = EXCLUDED.slug, 
+                                   status = EXCLUDED.status, 
+                                   images = EXCLUDED.images, 
+                                   description = EXCLUDED.description");
                                    
             foreach ($products as $p) {
                 // Find or create category
@@ -88,7 +88,7 @@ try {
                     $stmt_cat_ins = $pdo->prepare("INSERT INTO categories (name, slug) VALUES (?, ?)");
                     $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $cat_name)));
                     $stmt_cat_ins->execute([$cat_name, $slug]);
-                    $cat_id = $pdo->lastInsertId();
+                    $cat_id = $pdo->lastInsertId('categories_id_seq');
                 }
                 
                 $images = json_encode($p['images'] ?? []);

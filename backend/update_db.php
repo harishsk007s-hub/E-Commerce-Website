@@ -1,55 +1,56 @@
 <?php
 /**
- * Robust Database Update Script for MySQL (XAMPP Compatible)
+ * Robust Database Update Script for PostgreSQL
  */
 $config = require __DIR__ . '/config/database.php';
 
 try {
     // Attempt direct connection to database first (standard for cloud hosted DBs)
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['dbname']};charset={$config['charset']}",
+        "pgsql:host={$config['host']};port={$config['port']};dbname={$config['dbname']}",
         $config['user'],
         $config['password'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 } catch (PDOException $e) {
-    // If unknown database error (1049), attempt database creation (standard for local development)
-    if ($e->getCode() == 1049 || strpos($e->getMessage(), 'Unknown database') !== false) {
-        try {
-            $pdo = new PDO(
-                "mysql:host={$config['host']};charset={$config['charset']}",
-                $config['user'],
-                $config['password'],
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-            );
-            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$config['dbname']}`");
-            
-            // Reconnect
-            $pdo = new PDO(
-                "mysql:host={$config['host']};dbname={$config['dbname']};charset={$config['charset']}",
-                $config['user'],
-                $config['password'],
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-            );
-        } catch (PDOException $createEx) {
-            die("Error creating database: " . $createEx->getMessage() . "\n");
+    // Attempt database creation if connection failed (standard for local development)
+    try {
+        $pdo = new PDO(
+            "pgsql:host={$config['host']};port={$config['port']};dbname=postgres",
+            $config['user'],
+            $config['password'],
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+        $dbname = $config['dbname'];
+        
+        // Check if database exists
+        $stmt = $pdo->prepare("SELECT 1 FROM pg_database WHERE datname = ?");
+        $stmt->execute([$dbname]);
+        if (!$stmt->fetch()) {
+            $pdo->exec("CREATE DATABASE \"$dbname\"");
+            echo "Created database $dbname.\n";
         }
-    } else {
-        die("Error connecting to database: " . $e->getMessage() . "\n");
+        
+        // Reconnect
+        $pdo = new PDO(
+            "pgsql:host={$config['host']};port={$config['port']};dbname={$dbname}",
+            $config['user'],
+            $config['password'],
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+    } catch (PDOException $createEx) {
+        die("Error connecting to database: " . $createEx->getMessage() . "\n");
     }
 }
 
 /**
- * Helper to add a column only if it doesn't already exist
+ * Helper to add a column only if it doesn't already exist in PostgreSQL
  */
 function addColumnIfNotExists($pdo, $table, $column, $definition, $after = '') {
-    $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
-    $stmt->execute([$column]);
+    $stmt = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?");
+    $stmt->execute([strtolower($table), strtolower($column)]);
     if (!$stmt->fetch()) {
-        $sql = "ALTER TABLE `$table` ADD COLUMN `$column` $definition";
-        if ($after) {
-            $sql .= " AFTER `$after`";
-        }
+        $sql = "ALTER TABLE \"$table\" ADD COLUMN \"$column\" $definition";
         $pdo->exec($sql);
         echo "Added column `$column` to table `$table`.\n";
         return true;
@@ -57,32 +58,38 @@ function addColumnIfNotExists($pdo, $table, $column, $definition, $after = '') {
     return false;
 }
 
-// 0. Ensure tables exist
+try {
+// 0. Ensure tables exist with PostgreSQL types
 $pdo->exec("CREATE TABLE IF NOT EXISTS categories (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE,
     image VARCHAR(255),
-    description TEXT
+    description TEXT,
+    parent_id INT DEFAULT 0,
+    sort_order INT DEFAULT 0,
+    seo_title VARCHAR(255),
+    seo_desc TEXT
 )");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     sku VARCHAR(100) UNIQUE,
     category_id INT,
-    price VARCHAR(255) NOT NULL,
+    price VARCHAR(255) NOT NULL DEFAULT '0.00',
     stock INT DEFAULT 0,
-    status TINYINT DEFAULT 1,
+    status SMALLINT DEFAULT 1,
     slug VARCHAR(255) UNIQUE,
     images JSON,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 )");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS customers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(20),
@@ -90,16 +97,16 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS customers (
 )");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     role VARCHAR(50) NOT NULL,
-    status TINYINT DEFAULT 1,
+    status SMALLINT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     customer_id INT,
     total DECIMAL(10, 2) NOT NULL,
     status VARCHAR(50) DEFAULT 'pending',
@@ -108,75 +115,75 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
     items JSON,
     shipping_address JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) AUTO_INCREMENT = 1001");
+)");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     setting_group VARCHAR(50),
     setting_key VARCHAR(50) UNIQUE,
     setting_value TEXT,
     setting_type VARCHAR(20) DEFAULT 'string'
 )");
 
-// 1. Update users table
-addColumnIfNotExists($pdo, 'users', 'password', 'VARCHAR(255)', 'username');
-addColumnIfNotExists($pdo, 'users', 'phone', 'VARCHAR(20)', 'email');
-addColumnIfNotExists($pdo, 'users', 'otp_code', 'VARCHAR(6)', 'status');
-addColumnIfNotExists($pdo, 'users', 'otp_expires', 'DATETIME', 'otp_code');
-addColumnIfNotExists($pdo, 'users', 'login_attempts', 'INT DEFAULT 0', 'otp_expires');
+// 1. Update users table columns
+addColumnIfNotExists($pdo, 'users', 'password', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'users', 'phone', 'VARCHAR(20)');
+addColumnIfNotExists($pdo, 'users', 'otp_code', 'VARCHAR(6)');
+addColumnIfNotExists($pdo, 'users', 'otp_expires', 'TIMESTAMP');
+addColumnIfNotExists($pdo, 'users', 'login_attempts', 'INT DEFAULT 0');
 
 // Ensure admin user exists with correct password
 $admin_pass = password_hash('admin@2026', PASSWORD_DEFAULT);
+$developer_pass = password_hash('admin@2026', PASSWORD_DEFAULT);
 
-// Check if admin user exists at all
-$stmt = $pdo->prepare("SELECT id FROM users WHERE username = 'admin'");
-$stmt->execute();
-if (!$stmt->fetch()) {
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, email, role, status) VALUES ('admin', ?, 'admin@example.com', 'super-admin', 1)");
-    $stmt->execute([$admin_pass]);
-    echo "Created admin user.\n";
-} else {
-    $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE username = 'admin' AND (password IS NULL OR password = '')");
-    $stmt->execute([$admin_pass]);
-    
-    // Check if admin has a password, if not, set it anyway (force update if needed)
-    $stmt = $pdo->prepare("SELECT password FROM users WHERE username = 'admin'");
-    $stmt->execute();
-    $admin_current = $stmt->fetch();
-    if ($admin_current && empty($admin_current['password'])) {
-        $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE username = 'admin'");
-        $stmt->execute([$admin_pass]);
+$default_users = [
+    ['developer', $developer_pass, 'developer-admin', 'developer@example.com', '0000000000', 1],
+    ['admin', $admin_pass, 'super-admin', 'admin@example.com', '0000000000', 1]
+];
+
+foreach ($default_users as $u) {
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute([$u[0]]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO users (username, password, role, email, phone, status) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute($u);
+        echo "Created user {$u[0]}.\n";
+    } else {
+        $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE username = ?");
+        $stmt->execute([$u[2], $u[0]]);
     }
 }
 
-// 2. Update orders table
-addColumnIfNotExists($pdo, 'orders', 'shipping_name', 'VARCHAR(255)', 'items');
-addColumnIfNotExists($pdo, 'orders', 'shipping_phone', 'VARCHAR(20)', 'shipping_name');
-addColumnIfNotExists($pdo, 'orders', 'shipping_address1', 'TEXT', 'shipping_phone');
-addColumnIfNotExists($pdo, 'orders', 'shipping_address2', 'TEXT', 'shipping_address1');
-addColumnIfNotExists($pdo, 'orders', 'shipping_landmark', 'VARCHAR(255)', 'shipping_address2');
-addColumnIfNotExists($pdo, 'orders', 'shipping_city', 'VARCHAR(100)', 'shipping_landmark');
-addColumnIfNotExists($pdo, 'orders', 'shipping_state', 'VARCHAR(100)', 'shipping_city');
-addColumnIfNotExists($pdo, 'orders', 'shipping_pincode', 'VARCHAR(10)', 'shipping_state');
-addColumnIfNotExists($pdo, 'orders', 'order_notes', 'TEXT', 'shipping_pincode');
-addColumnIfNotExists($pdo, 'orders', 'cod_delivery_otp', 'VARCHAR(6)', 'payment_method');
-addColumnIfNotExists($pdo, 'orders', 'coupon_code', 'VARCHAR(50)', 'cod_delivery_otp');
+// 2. Update orders table columns
+addColumnIfNotExists($pdo, 'orders', 'shipping_name', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'orders', 'shipping_phone', 'VARCHAR(20)');
+addColumnIfNotExists($pdo, 'orders', 'shipping_address1', 'TEXT');
+addColumnIfNotExists($pdo, 'orders', 'shipping_address2', 'TEXT');
+addColumnIfNotExists($pdo, 'orders', 'shipping_landmark', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'orders', 'shipping_city', 'VARCHAR(100)');
+addColumnIfNotExists($pdo, 'orders', 'shipping_state', 'VARCHAR(100)');
+addColumnIfNotExists($pdo, 'orders', 'shipping_pincode', 'VARCHAR(10)');
+addColumnIfNotExists($pdo, 'orders', 'order_notes', 'TEXT');
+addColumnIfNotExists($pdo, 'orders', 'cod_delivery_otp', 'VARCHAR(6)');
+addColumnIfNotExists($pdo, 'orders', 'coupon_code', 'VARCHAR(50)');
 
-// 2.1 Set Order ID to start from 1001 if it's currently low
-$pdo->exec("ALTER TABLE orders AUTO_INCREMENT = 1001");
+// 2.1 Set Order ID Sequence to start from 1001 if empty
+try {
+    $pdo->exec("ALTER SEQUENCE orders_id_seq RESTART WITH 1001");
+} catch (Exception $e) {}
 
-// 3. Update customers table
-addColumnIfNotExists($pdo, 'customers', 'username', 'VARCHAR(100) UNIQUE', 'email');
-addColumnIfNotExists($pdo, 'customers', 'password_hash', 'VARCHAR(255)', 'username');
-addColumnIfNotExists($pdo, 'customers', 'auth_token', 'VARCHAR(255)', 'password_hash');
-addColumnIfNotExists($pdo, 'customers', 'auth_token_expires', 'DATETIME', 'auth_token');
-addColumnIfNotExists($pdo, 'customers', 'otp_code', 'VARCHAR(6)', 'email');
-addColumnIfNotExists($pdo, 'customers', 'otp_expires', 'DATETIME', 'otp_code');
-addColumnIfNotExists($pdo, 'customers', 'login_attempts', 'INT DEFAULT 0', 'email');
-addColumnIfNotExists($pdo, 'customers', 'last_login', 'DATETIME', 'login_attempts');
-addColumnIfNotExists($pdo, 'customers', 'role', 'VARCHAR(50) DEFAULT "customer"', 'last_login');
-addColumnIfNotExists($pdo, 'customers', 'reset_token', 'VARCHAR(255)', 'role');
-addColumnIfNotExists($pdo, 'customers', 'reset_expires', 'DATETIME', 'reset_token');
+// 3. Update customers table columns
+addColumnIfNotExists($pdo, 'customers', 'username', 'VARCHAR(100) UNIQUE');
+addColumnIfNotExists($pdo, 'customers', 'password_hash', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'customers', 'auth_token', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'customers', 'auth_token_expires', 'TIMESTAMP');
+addColumnIfNotExists($pdo, 'customers', 'otp_code', 'VARCHAR(6)');
+addColumnIfNotExists($pdo, 'customers', 'otp_expires', 'TIMESTAMP');
+addColumnIfNotExists($pdo, 'customers', 'login_attempts', 'INT DEFAULT 0');
+addColumnIfNotExists($pdo, 'customers', 'last_login', 'TIMESTAMP');
+addColumnIfNotExists($pdo, 'customers', 'role', 'VARCHAR(50) DEFAULT \'customer\'');
+addColumnIfNotExists($pdo, 'customers', 'reset_token', 'VARCHAR(255)');
+addColumnIfNotExists($pdo, 'customers', 'reset_expires', 'TIMESTAMP');
 
 try { 
     $pdo->exec("ALTER TABLE customers DROP COLUMN password"); 
@@ -185,25 +192,26 @@ try {
 
 // 4. Create invoices table
 $pdo->exec("CREATE TABLE IF NOT EXISTS invoices (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    order_id INT,
-    invoice_pdf LONGBLOB,
+    id SERIAL PRIMARY KEY,
+    order_id INT UNIQUE,
+    invoice_pdf BYTEA,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 )");
 echo "Ensured `invoices` table exists.\n";
 
-// 5. Ensure API tables exist for auth.php
+// 5. Ensure API tables exist
 $pdo->exec("CREATE TABLE IF NOT EXISTS api_clients (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255),
     api_key VARCHAR(255) UNIQUE,
-    status TINYINT DEFAULT 1,
+    status SMALLINT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
+echo "Ensured `api_clients` table exists.\n";
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS api_logs (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     client_id INT,
     endpoint VARCHAR(255),
     method VARCHAR(10),
@@ -215,46 +223,65 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS api_logs (
 )");
 
 // Insert default API key used by frontend
-$stmt = $pdo->prepare("INSERT IGNORE INTO api_clients (name, api_key, status) VALUES (?, ?, ?)");
-$stmt->execute(['Frontend App', 'sk_live_zenco_123456789', 1]);
-echo "Ensured API Client exists.\n";
+$stmt = $pdo->prepare("SELECT 1 FROM api_clients WHERE api_key = ?");
+$stmt->execute(['sk_live_zenco_123456789']);
+if (!$stmt->fetch()) {
+    $stmt = $pdo->prepare("INSERT INTO api_clients (name, api_key, status) VALUES (?, ?, ?)");
+    $stmt->execute(['Frontend App', 'sk_live_zenco_123456789', 1]);
+    echo "Created API Client.\n";
+}
 
 // 6. Ensure carts table exists
 $pdo->exec("CREATE TABLE IF NOT EXISTS carts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     client_id INT,
     session_id VARCHAR(255),
     items JSON,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES api_clients(id) ON DELETE CASCADE
 )");
 
-addColumnIfNotExists($pdo, 'carts', 'user_id', 'INT NULL', 'session_id');
+addColumnIfNotExists($pdo, 'carts', 'user_id', 'INT NULL');
 try {
     $pdo->exec("ALTER TABLE carts ADD FOREIGN KEY (user_id) REFERENCES customers(id) ON DELETE CASCADE");
 } catch(Exception $e) {}
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS magic_links (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
     token VARCHAR(255) NOT NULL UNIQUE,
     expires_at BIGINT NOT NULL,
-    used TINYINT(1) DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    used SMALLINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
-// Explicitly update expires_at column to BIGINT if it's currently something else
-try {
-    $pdo->exec("ALTER TABLE magic_links MODIFY COLUMN expires_at BIGINT NOT NULL");
-} catch(Exception $e) {}
+echo "Ensured `magic_links` table exists.\n";
 
-echo "Ensured `magic_links` table exists and uses BIGINT for expiration.\n";
+$pdo->exec("CREATE TABLE IF NOT EXISTS payment_gateways (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    enabled SMALLINT DEFAULT 0,
+    config JSON,
+    sort_order INT DEFAULT 0
+)");
 
-// 7. Add default settings
-$stmt = $pdo->prepare("INSERT IGNORE INTO settings (setting_group, setting_key, setting_value, setting_type) VALUES (?, ?, ?, ?)");
-$stmt->execute(['general', 'store_gstin', '33AAAAA0000A1Z5', 'string']);
-$stmt->execute(['general', 'store_name', 'Goappalam', 'string']);
-$stmt->execute(['general', 'store_email', 'goappalam@gmail.com', 'string']);
+echo "Ensured `payment_gateways` table exists.\n";
+
+// 7. Add default settings using check-then-insert
+$default_settings = [
+    ['general', 'store_gstin', '33AAAAA0000A1Z5', 'string'],
+    ['general', 'store_name', 'Goappalam', 'string'],
+    ['general', 'store_email', 'goappalam@gmail.com', 'string']
+];
+foreach ($default_settings as $sett) {
+    $stmt = $pdo->prepare("SELECT 1 FROM settings WHERE setting_key = ?");
+    $stmt->execute([$sett[1]]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO settings (setting_group, setting_key, setting_value, setting_type) VALUES (?, ?, ?, ?)");
+        $stmt->execute($sett);
+    }
+}
 echo "Settings updated.\n";
 
 // 7.5 Seed Categories
@@ -268,30 +295,26 @@ $categories_to_seed = [
     ['name' => 'Sovi', 'slug' => 'sovi']
 ];
 
-$stmt = $pdo->prepare("INSERT IGNORE INTO categories (name, slug) VALUES (?, ?)");
 foreach ($categories_to_seed as $cat) {
-    $stmt->execute([$cat['name'], $cat['slug']]);
+    $stmt = $pdo->prepare("SELECT 1 FROM categories WHERE slug = ?");
+    $stmt->execute([$cat['slug']]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO categories (name, slug) VALUES (?, ?)");
+        $stmt->execute([$cat['name'], $cat['slug']]);
+    }
 }
 echo "Categories seeded.\n";
 
-// 8. Update products table for price range support and missing columns
-try {
-    // Change price to VARCHAR to support ranges like "65 - 250"
-    $pdo->exec("ALTER TABLE `products` MODIFY COLUMN `price` VARCHAR(255) NOT NULL");
-    echo "Modified `price` column in `products` to VARCHAR(255).\n";
-} catch(Exception $e) {
-    echo "Note: Could not modify `price` column (might already be VARCHAR).\n";
-}
-
-addColumnIfNotExists($pdo, 'products', 'price_1kg', 'DECIMAL(10, 2)', 'price');
-addColumnIfNotExists($pdo, 'products', 'price_500g', 'DECIMAL(10, 2)', 'price_1kg');
-addColumnIfNotExists($pdo, 'products', 'price_250g', 'DECIMAL(10, 2)', 'price_500g');
-addColumnIfNotExists($pdo, 'products', 'slug', 'VARCHAR(255) UNIQUE', 'name');
-addColumnIfNotExists($pdo, 'products', 'status', 'TINYINT DEFAULT 1', 'price_250g');
-addColumnIfNotExists($pdo, 'products', 'images', 'JSON', 'status');
-addColumnIfNotExists($pdo, 'products', 'variants', 'JSON', 'images');
-addColumnIfNotExists($pdo, 'products', 'tags', 'JSON', 'variants');
-addColumnIfNotExists($pdo, 'products', 'description', 'TEXT', 'name');
+// 8. Update products table columns
+addColumnIfNotExists($pdo, 'products', 'price_1kg', 'DECIMAL(10, 2)');
+addColumnIfNotExists($pdo, 'products', 'price_500g', 'DECIMAL(10, 2)');
+addColumnIfNotExists($pdo, 'products', 'price_250g', 'DECIMAL(10, 2)');
+addColumnIfNotExists($pdo, 'products', 'slug', 'VARCHAR(255) UNIQUE');
+addColumnIfNotExists($pdo, 'products', 'status', 'SMALLINT DEFAULT 1');
+addColumnIfNotExists($pdo, 'products', 'images', 'JSON');
+addColumnIfNotExists($pdo, 'products', 'variants', 'JSON');
+addColumnIfNotExists($pdo, 'products', 'tags', 'JSON');
+addColumnIfNotExists($pdo, 'products', 'description', 'TEXT');
 
 // 9. Populate Slugs for products that don't have them
 $stmt = $pdo->query("SELECT id, name FROM products WHERE slug IS NULL OR slug = ''");
@@ -301,7 +324,6 @@ if (count($products_to_update) > 0) {
     $update_stmt = $pdo->prepare("UPDATE products SET slug = ? WHERE id = ?");
     foreach ($products_to_update as $p) {
         $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $p['name'])));
-        // Ensure unique slug (simple version)
         $slug = $slug . '-' . $p['id'];
         $update_stmt->execute([$slug, $p['id']]);
     }
@@ -316,10 +338,136 @@ foreach ($cats as $cat) {
     $stmt->execute([$cat['id'], $searchTerm, $searchTerm]);
 }
 
-// Special case for Combo if name doesn't contain "Combo" but "and"
-$combo_id = $pdo->query("SELECT id FROM categories WHERE name = 'Combo'")->fetchColumn();
-if ($combo_id) {
-    $pdo->prepare("UPDATE products SET category_id = ? WHERE name LIKE '% and %' AND (category_id IS NULL OR category_id = 0)")->execute([$combo_id]);
+// 11. Seed Products using check-then-insert
+$products_to_seed = [
+    [
+        'id' => 10,
+        'name' => 'Appalam',
+        'description' => '100 % Traditional Hand made Appalam, Papad / Papadum prepared from selected quality Urad Dhal from specific region of India. Crispy & Tasty, Hygienically made.',
+        'sku' => 'APP-001',
+        'category_id' => 5, // Papadam
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'appalam',
+        'images' => '["/assests/uploads/2021/04/cumin-round-big-1.jpg"]',
+        'variants' => '[{"name": "Kilogram", "options": ["1/4 Kg", "1/2 Kg", "1 Kilogram"]}]'
+    ],
+    [
+        'id' => 11,
+        'name' => 'Sovi appalam',
+        'description' => 'Traditional crunchy sovi appalam made with pure ingredients.',
+        'sku' => 'SOVI-001',
+        'category_id' => 7, // Sovi
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'sovi-appalam',
+        'images' => '["/assests/uploads/2020/08/sovi-big-450x450.jpg"]',
+        'variants' => '[]'
+    ],
+    [
+        'id' => 12,
+        'name' => 'Black Pepper Leaf appalam',
+        'description' => 'Leaf shaped appalam with authentic black pepper flavor.',
+        'sku' => 'BP-001',
+        'category_id' => 1, // Black Pepper
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'black-pepper-leaf-appalam',
+        'images' => '["/assests/uploads/2021/04/Product-1-450x450.jpg"]',
+        'variants' => '[]'
+    ],
+    [
+        'id' => 13,
+        'name' => 'Chilli Pepper and Cumin Papad',
+        'description' => 'Perfect blend of spicy chilli and aromatic cumin in every bite.',
+        'sku' => 'CP-001',
+        'category_id' => 2, // Chilli Pepper
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'chilli-pepper-cumin-papad',
+        'images' => '["/assests/uploads/2021/12/C3-450x450.jpg"]',
+        'variants' => '[]'
+    ],
+    [
+        'id' => 14,
+        'name' => 'Black Pepper and Cumin Papad',
+        'description' => 'A classic combination of black pepper and cumin for a rich taste.',
+        'sku' => 'BPC-001',
+        'category_id' => 5, // Papadam
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'black-pepper-cumin-papad',
+        'images' => '["/assests/uploads/2021/12/C2-450x450.jpg"]',
+        'variants' => '[]'
+    ],
+    [
+        'id' => 15,
+        'name' => 'Jeera Leaf Appalam Big',
+        'description' => 'Large leaf-shaped appalam infused with premium cumin seeds.',
+        'sku' => 'JL-001',
+        'category_id' => 4, // Cumin
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'jeera-leaf-appalam-big',
+        'images' => '["/assests/uploads/2021/04/cumin-round-big-1-450x450.jpg"]',
+        'variants' => '[]'
+    ],
+    [
+        'id' => 16,
+        'name' => 'Ring Appalam Big',
+        'description' => 'Fun ring-shaped appalams that kids and adults both love.',
+        'sku' => 'RING-001',
+        'category_id' => 6, // Ring
+        'price' => '65.00',
+        'stock' => 100,
+        'slug' => 'ring-appalam-big',
+        'images' => '["/assests/uploads/2020/08/ring-big-450x450.jpg"]',
+        'variants' => '[]'
+    ]
+];
+
+foreach ($products_to_seed as $p) {
+    $stmt = $pdo->prepare("SELECT id FROM products WHERE sku = ?");
+    $stmt->execute([$p['sku']]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO products (id, name, description, sku, category_id, price, stock, slug, images, variants) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::json, ?::json)");
+        $stmt->execute([
+            $p['id'],
+            $p['name'],
+            $p['description'],
+            $p['sku'],
+            $p['category_id'],
+            $p['price'],
+            $p['stock'],
+            $p['slug'],
+            $p['images'],
+            $p['variants']
+        ]);
+        echo "Seeded product: {$p['name']}.\n";
+    }
+}
+
+// Reset products sequence after seeding
+try {
+    $pdo->exec("SELECT setval('products_id_seq', (SELECT MAX(id) FROM products))");
+} catch (Exception $e) {}
+
+// 12. Seed Payment Gateways using check-then-insert
+$gateways_to_seed = [
+    ['cod', 'Cash on Delivery', 1, '{"instruction": "Pay on delivery"}'],
+    ['stripe', 'Stripe', 0, '{"api_key": "pk_test_...", "secret_key": "sk_test_...", "mode": "test"}'],
+    ['paypal', 'PayPal', 1, '{"client_id": "AZ...", "secret": "EL...", "mode": "sandbox"}'],
+    ['razorpay', 'Razorpay', 0, '{"key_id": "rzp_test_...", "key_secret": "..."}'],
+    ['upi', 'UPI Pay', 1, '{"upi_id": "zenco@upi", "merchant_name": "Zenco Hub"}']
+];
+foreach ($gateways_to_seed as $g) {
+    $stmt = $pdo->prepare("SELECT 1 FROM payment_gateways WHERE code = ?");
+    $stmt->execute([$g[0]]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO payment_gateways (code, name, enabled, config) VALUES (?, ?, ?, ?::json)");
+        $stmt->execute($g);
+        echo "Seeded gateway: {$g[1]}.\n";
+    }
 }
 
 echo "Database schema update check completed successfully.\n";

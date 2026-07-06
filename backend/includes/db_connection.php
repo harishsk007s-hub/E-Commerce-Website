@@ -22,16 +22,15 @@ if (!function_exists('loadEnvForDB')) {
     }
 }
 
-// Try to load .env from root (adjust path based on where we are called from)
+// Try to load .env from root
 loadEnvForDB(__DIR__ . '/../../.env');
 
 $db_config = require __DIR__ . '/../config/database.php';
 
-$dsn = "mysql:host={$db_config['host']};dbname={$db_config['dbname']};charset={$db_config['charset']}";
+$dsn = "pgsql:host={$db_config['host']};port={$db_config['port']};dbname={$db_config['dbname']}";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
 try {
@@ -42,7 +41,6 @@ try {
     error_log("DB_CONN_ERROR [{$errId}]: " . $e->getMessage());
     header('Content-Type: application/json');
     http_response_code(500);
-    // Include the actual error message temporarily to help with deployment debugging
     echo json_encode([
         "error" => "Database connection failed", 
         "details" => $e->getMessage(),

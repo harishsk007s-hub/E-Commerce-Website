@@ -67,7 +67,7 @@ if (empty($api_key)) {
 
 try {
     // Check if api_clients table exists
-    $stmt = $pdo->query("SHOW TABLES LIKE 'api_clients'");
+    $stmt = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'api_clients'");
     if (!$stmt->fetch()) {
         json_response(['error' => 'System error: api_clients table missing. Run update_db.php'], 500);
     }

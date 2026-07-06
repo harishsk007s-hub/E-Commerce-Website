@@ -120,5 +120,5 @@ function getOrCreateCustomer($email, $name = 'New Customer') {
     
     $stmt = $pdo->prepare("INSERT INTO customers (name, email) VALUES (?, ?)");
     $stmt->execute([$name, $email]);
-    return $pdo->lastInsertId();
+    return $pdo->lastInsertId('customers_id_seq');
 }

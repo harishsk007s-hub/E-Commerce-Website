@@ -68,7 +68,7 @@ if ($is_verified) {
 
         if ($order) {
             // Update customer order count
-            $pdo->prepare("UPDATE customers SET orders_count = IFNULL(orders_count, 0) + 1 WHERE id = ?")->execute([$order['customer_id']]);
+            $pdo->prepare("UPDATE customers SET orders_count = COALESCE(orders_count, 0) + 1 WHERE id = ?")->execute([$order['customer_id']]);
 
             // Deduct stock
             $items = json_decode($order['items'], true);

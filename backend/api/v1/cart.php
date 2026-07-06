@@ -152,10 +152,10 @@ try {
         $items_json = json_encode($items);
         
         if ($cart) {
-            $stmt = $pdo->prepare("UPDATE carts SET items = ?, session_id = ?, user_id = ? WHERE id = ?");
+            $stmt = $pdo->prepare("UPDATE carts SET items = ?::json, session_id = ?, user_id = ? WHERE id = ?");
             $stmt->execute([$items_json, $session_id, $user_id ?: $cart['user_id'], $cart['id']]);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO carts (client_id, session_id, user_id, items) VALUES (?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO carts (client_id, session_id, user_id, items) VALUES (?, ?, ?, ?::json)");
             $stmt->execute([CLIENT_ID, $session_id, $user_id ?: null, $items_json]);
         }
         
@@ -204,7 +204,7 @@ try {
         }
 
         $items_json = json_encode($new_items);
-        $stmt = $pdo->prepare("UPDATE carts SET items = ?, session_id = ?, user_id = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE carts SET items = ?::json, session_id = ?, user_id = ? WHERE id = ?");
         $stmt->execute([$items_json, $session_id, $user_id ?: $cart['user_id'], $cart['id']]);
 
         json_response(['status' => 'success', 'message' => 'Cart updated']);
@@ -277,7 +277,7 @@ try {
                         }
                     }
                     
-                    $stmt = $pdo->prepare("UPDATE carts SET items = ?, session_id = ? WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE carts SET items = ?::json, session_id = ? WHERE id = ?");
                     $stmt->execute([json_encode($user_items), $session_id, $user_cart['id']]);
                     
                     // Delete guest cart

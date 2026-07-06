@@ -4,7 +4,7 @@
 # Environment Propagation for PHP
 # ==============================================================================
 echo "Propagating environment variables to /var/www/html/.env..."
-env | grep -E "^(DB_|SMTP_|EMAIL_|ALLOWED_|VITE_|APP_ENV|BASE_URL|FRONTEND_URL|X_API_KEY|RAZORPAY_)" > /var/www/html/.env
+env | grep -E "^(DB_|DATABASE_URL|SMTP_|EMAIL_|ALLOWED_|VITE_|APP_ENV|BASE_URL|FRONTEND_URL|X_API_KEY|RAZORPAY_)" > /var/www/html/.env
 
 # ==============================================================================
 # Start Node.js Express Backend
@@ -36,6 +36,12 @@ if [ ! -z "$PORT" ]; then
   sed -i "s/Listen 80/Listen $PORT/g" /etc/apache2/ports.conf
   sed -i "s/<VirtualHost \*:80>/<VirtualHost *:$PORT>/g" /etc/apache2/sites-available/000-default.conf
 fi
+
+# ==============================================================================
+# Run Database Updates and Seeding
+# ==============================================================================
+echo "Running database updates and seeding..."
+php /var/www/html/backend/update_db.php
 
 # ==============================================================================
 # Start Apache Web Server (Foreground)

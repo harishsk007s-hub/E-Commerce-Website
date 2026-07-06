@@ -48,7 +48,7 @@ try {
     
     // Also store in database if table exists
     try {
-        $stmt = $pdo->query("SHOW TABLES LIKE 'contact_messages'");
+        $stmt = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'contact_messages'");
         if ($stmt->fetch()) {
             $stmt = $pdo->prepare("INSERT INTO contact_messages (name, email, subject, message, status) VALUES (?, ?, ?, ?, 'unread')");
             $stmt->execute([$name, $email, $subject, $message]);

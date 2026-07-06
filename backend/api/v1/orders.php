@@ -87,7 +87,7 @@ try {
             $cid = $customer_id ?: $user_id;
             $stmt = $pdo->prepare("UPDATE customers SET 
                 phone = COALESCE(NULLIF(phone, ''), ?),
-                addresses = ?
+                addresses = ?::json
                 WHERE id = ?");
             
             // For addresses, we can store the latest one in the JSON array or just as a single object if that's how it's used
@@ -100,7 +100,7 @@ try {
         }
 
         $stmt = $pdo->prepare("INSERT INTO orders (customer_id, client_id, subtotal, tax_amount, shipping_fee, discount_amount, total, items, shipping_name, shipping_phone, shipping_address1, shipping_address2, shipping_landmark, shipping_city, shipping_state, shipping_pincode, shipping_address, payment_method, cod_delivery_otp, status, payment_status) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?::json, ?, ?, ?, ?, ?, ?, ?, ?, ?::json, ?, ?, ?, ?)");
         $stmt->execute([
             $customer_id ?: ($user_id ?: null),
             CLIENT_ID,
@@ -124,7 +124,7 @@ try {
             $order_status,
             'pending' // payment_status
         ]);
-        $order_id = $pdo->lastInsertId();
+        $order_id = $pdo->lastInsertId('orders_id_seq');
         
         $customer_full_address = ($shipping_address['address1'] ?? '') . ', ' . ($shipping_address['address2'] ?? '') . ', ' . ($shipping_address['city'] ?? '') . ', ' . ($shipping_address['state'] ?? '') . ' - ' . ($shipping_address['pincode'] ?? '');
 
@@ -133,7 +133,7 @@ try {
         if ($payment_method === 'cod') {
             // Update customer order count
             if ($customer_id || $user_id) {
-                $pdo->prepare("UPDATE customers SET orders_count = IFNULL(orders_count, 0) + 1 WHERE id = ?")->execute([$customer_id ?: $user_id]);
+                $pdo->prepare("UPDATE customers SET orders_count = COALESCE(orders_count, 0) + 1 WHERE id = ?")->execute([$customer_id ?: $user_id]);
             }
             
             // Generate Invoice PDF

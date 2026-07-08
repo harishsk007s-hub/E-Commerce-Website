@@ -48,4 +48,8 @@ php /var/www/html/backend/update_db.php
 # ==============================================================================
 echo "Starting Apache Web Server..."
 cd /var/www/html
+
+# Show all loaded Apache modules
+apachectl -M
+
 exec apache2-foreground

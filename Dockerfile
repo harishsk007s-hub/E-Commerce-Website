@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json tsconfig*.json vite.config.ts tailwind.config.js postcss.config.js index.html ./
 COPY src/ ./src
 COPY public/ ./public
-RUN npm ci
+RUN npm install
 RUN npm run build
 
 # ==========================================
@@ -14,9 +14,12 @@ RUN npm run build
 # ==========================================
 FROM node:18-alpine AS backend-builder
 WORKDIR /app
-COPY server/package*.json server/tsconfig.json ./
+
+COPY server/package*.json ./
+RUN npm install
+
 COPY server/ ./
-RUN npm ci
+
 RUN npm run build
 
 # ==========================================

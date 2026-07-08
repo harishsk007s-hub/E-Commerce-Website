@@ -44,15 +44,20 @@ echo "Running database updates and seeding..."
 php /var/www/html/backend/update_db.php
 
 # ==============================================================================
+# Configure and Verify Apache MPM
+# ==============================================================================
+echo "Ensuring only mpm_prefork is enabled..."
+a2dismod mpm_event || true
+a2dismod mpm_worker || true
+a2enmod mpm_prefork || true
+
+echo "=== Verifying Apache Configuration ==="
+apachectl -t
+apachectl -M
+
+# ==============================================================================
 # Start Apache Web Server (Foreground)
 # ==============================================================================
 echo "Starting Apache Web Server..."
 cd /var/www/html
-
-echo "=== Enabled Apache modules ==="
-ls -l /etc/apache2/mods-enabled/
-
-echo "=== Enabled Apache sites ==="
-ls -l /etc/apache2/sites-enabled/
-
 exec apache2-foreground

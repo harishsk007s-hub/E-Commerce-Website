@@ -46,13 +46,17 @@ RUN apt-get update && apt-get install -y \
 
 # Enable Apache modules required for rewrites and reverse proxies
 # Fix Apache MPM conflict and enable required modules
-RUN a2dismod mpm_event || true
-RUN a2dismod mpm_worker || true
-RUN a2enmod mpm_prefork
-RUN a2enmod rewrite proxy proxy_http headers
+# Fix Apache MPM conflict and enable required modules
+RUN a2dismod mpm_event || true \
+    && a2dismod mpm_worker || true \
+    && a2enmod mpm_prefork \
+    && a2enmod rewrite proxy proxy_http headers
 
 # Copy custom Apache virtual host configuration
 COPY apache-vhost.conf /etc/apache2/sites-available/000-default.conf
+
+# Verify Apache configuration at build time
+RUN apachectl -t && apachectl -M
 
 # Set up working directory in Apache DocumentRoot
 WORKDIR /var/www/html
